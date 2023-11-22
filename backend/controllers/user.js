@@ -1,52 +1,42 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
+import validator from 'validator';
 import User from '../models/user.js';
 
-import validateEmail from '../utils/validateEmail.js';
-import validatePassword from '../utils/validatePassword.js';
-import matchPasswords from '../utils/matchPasswords.js';
-import hashPassword from '../utils/hashPassword.js';
+
 
 const userControllers = {
     register: async (req, res) => {
         try {
-            const { email, password, rePassword } = req.body;
+            const { name, email, password } = req.body;
 
             // Check if the email already exists
             const userExist = await User.findOne({ email: email });
 
-            if (userExist) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Email already exists'
-                });
-            } else {
-                // Validate email and password
-                if (
-                    !validateEmail(email) ||
-                    !validatePassword(password) ||
-                    !matchPasswords(password, rePassword)
-                ) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Invalid email or password format'
-                    });
-                }
+            if (userExist) return res.status(400).json({
+                success: false, message: 'Email already exists'
+            });
 
-                // Hash the password
-                const hashedPassword = hashPassword(password);
+            if (!name || !email || !password) return res.status(400).json({
+                success: false, message: 'All fields repaired'
+            });
+            if (!validator.isEmail(email)) return res.status(400).json({
+                success: false, message: 'Email must be valid'
+            });
+            if (!validator.isStrongPassword(password)) return res.status(400).json({
+                success: false, message: 'Password must be strong'
+            });
 
-                // Create a new user
-                const user = await User.create({
-                    email,
-                    password: hashedPassword
-                });
-                return res.status(201).json({
-                    success: true,
-                    message: `User with ${email} has been created`
-                });
-            }
+
+            // hashedPassword
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Create a new user
+            const newUser = await User.create({ name, email, password: hashedPassword });
+            return res.status(201).json({
+                success: true,
+                message: `User with ${email} has been created`
+            });
         } catch (err) {
             return res.status(500).json({
                 success: false,
@@ -54,66 +44,76 @@ const userControllers = {
             });
         }
     },
+
     login: async (req, res) => {
         try {
             const { email, password } = req.body;
 
             // Check if the email exists
             const userExist = await User.findOne({ email: email });
-            if (userExist) {
-                // Compare passwords
-                const isValid = await bcrypt.compare(
-                    password,
-                    userExist.password
-                );
-                if (isValid) {
-                    // Generate a JWT token
-                    const token = jwt.sign(
-                        { userExist: userExist },
-                        process.env.TOKEN_ACCESS_SECRET,
-                        { expiresIn: '1d' }
-                    );
 
-                    // Set cookies
-                    res.cookie('_id', userExist._id, {
-                        secure: true,
-                        sameSite: 'None'
-                    });
-                    res.cookie('token', token, {
-                        httpOnly: true,
-                        secure: true,
-                        sameSite: 'None'
-                    });
-                    return res
-                        .status(200)
-                        .json({ success: true, token, id: userExist._id });
-                } else {
-                    return res.status(401).json({
-                        success: false,
-                        message: 'Email or password is incorrect'
-                    });
-                }
+            if (!userExist) return res.status(401).json({
+                success: false,
+                message: 'Email or password is incorrect...'
+            });
+
+            // Compare passwords
+            const isValid = await bcrypt.compare(
+                password,
+                userExist.password
+            );
+            if (isValid) {
+                // Generate a JWT token
+                const token = jwt.sign(
+                    { userExist: userExist },
+                    process.env.TOKEN_ACCESS_SECRET,
+                    { expiresIn: '1d' }
+                );
+                return res
+                    .status(200)
+                    .json({ success: true, name: userExist.name, token, id: userExist._id });
+
             } else {
                 return res.status(401).json({
                     success: false,
                     message: 'User not found. Please register first.'
                 });
             }
-        } catch (err) {
+        } catch (error) {
             return res.status(500).json({
                 success: false,
-                err: err.message
+                err: error.message
             });
         }
     },
-    logout: (req, res) => {
-        // Clear cookies
-        res.clearCookie('token');
-        res.clearCookie('_id');
 
-        return res
-            .status(200)
-            .json({ success: true, message: 'User logged out successfully' });
+    findUser: async (req, res) => {
+        const { id } = req.params;
+        try {
+            const fineUser = await User.findById(id);
+            return res
+                .status(200)
+                .json({ success: true, user: fineUser });
+        } catch (error) {
+            return res.status(500).json({
+                success: false,
+                err: error.message
+            });
+        }
+    },
+
+    getUsers: async (req, res) => {
+        try {
+            const users = await User.find({});
+            return res
+                .status(200)
+                .json({ success: true, users: users });
+        } catch (error) {
+            return res.status(500).json({
+                success: false,
+                err: error.message
+            });
+        }
     }
 };
 

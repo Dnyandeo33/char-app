@@ -1,40 +1,32 @@
-import { useState, useEffect } from 'react';
-import io from 'socket.io-client';
-import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import { useContext } from 'react';
 
-import Chat from './components/Chat';
-
-const socket = io('http://localhost:5002');
+import { Container } from 'react-bootstrap';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import NavigationBar from './components/Navbar';
+import { AuthContext } from './context/AuthContext';
+import { ChatContextProvider } from './context/ChatContext';
+import Chat from './pages/Chat';
+import Login from './pages/login';
+import Registration from './pages/registration';
 
 const App = () => {
-    const [room, setRoom] = useState('');
-    const [name, setName] = useState('');
-
-    const joinRoom = () => {
-        if (room && name) {
-            socket.emit('joinRoom', { room, name });
-        }
-    };
-
+    const { user } = useContext(AuthContext);
     return (
-        <div>
-            <h3>Join chat</h3>
-            <input
-                type="text"
-                placeholder="Room number"
-                onChange={(e) => setRoom(e.target.value)}
-            />
-            <input
-                type="text"
-                placeholder="John..."
-                onChange={(e) => setName(e.target.value)}
-            />
-            <button onClick={joinRoom} type="button">
-                Join
-            </button>
-
-            <Chat socket={socket} name={name} room={room} />
-        </div>
+        <ChatContextProvider user={user}>
+            <NavigationBar />
+            <Container>
+                <Routes>
+                    <Route path="/" element={user ? <Chat /> : <Login />} />
+                    <Route path="/register" element={<Registration />} />
+                    <Route
+                        path="/login"
+                        element={user ? <Chat /> : <Login />}
+                    />
+                    <Route path="*" element={<Navigate to="/" />} />
+                </Routes>
+            </Container>
+        </ChatContextProvider>
     );
 };
 

@@ -1,10 +1,12 @@
-import express from 'express';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import cookieParser from 'cookie-parser';
-import { Server } from 'socket.io';
+import express from 'express';
+import initializeSocket from './socket/socket.js';
 
 import connectToDB from './config/db.js';
+import chatRoutes from './routes/chat.js';
+import messageRoutes from './routes/message.js';
 import userRoutes from './routes/user.js';
 
 import logger from './middleware/logger.js';
@@ -23,13 +25,16 @@ app.use(
     })
 );
 
-app.use(logger);
+// app.use(logger);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // routes
 app.use(userRoutes);
+app.use(chatRoutes);
+app.use(messageRoutes);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -48,28 +53,4 @@ const server = app.listen(PORT, () => {
 });
 
 // socket io
-const io = new Server(server, {
-    cors: {
-        origin: 'http://localhost:5173'
-    }
-});
-
-io.on('connection', (socket) => {
-    console.log(`user connected ${socket.id}`);
-
-    // join room
-    socket.on('joinRoom', (data) => {
-        socket.join(data.room);
-        console.log(`${data.name} joined room ${data.room}`);
-    });
-
-    // message
-    socket.on('newMessage', (data) => {
-        console.log(data);
-        io.to(data.room).emit('getMessage', data);
-    });
-
-    socket.on('disconnect', () => {
-        console.log(`user disconnected ${socket.id}`);
-    });
-});
+initializeSocket(server)
